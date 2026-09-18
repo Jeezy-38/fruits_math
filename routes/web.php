@@ -41,5 +41,6 @@ Route::middleware(['auth', 'role:parent'])->group(function () {
 });
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin', AdminDashboard::class)->name('admin.dashboard');
+    
     Route::get('/admin/curriculum', Curriculum::class)->name('admin.curriculum');
 });
