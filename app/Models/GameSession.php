@@ -22,4 +22,9 @@ class GameSession extends Model
     {
         return $this->belongsTo(ChildProfile::class, 'child_profile_id');
     }
+
+    public function level()
+    {
+        return $this->belongsTo(GameLevel::class, 'game_level_id');
+    }
 }

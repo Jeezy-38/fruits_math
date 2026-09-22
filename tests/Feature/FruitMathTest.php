@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\Curriculum;
+use App\Livewire\Child\ChildHome;
 use App\Livewire\GameBoard;
 use App\Livewire\SelectPlayer;
 use App\Models\ChildProfile;
@@ -168,7 +169,7 @@ class FruitMathTest extends TestCase
         $this->loginParent();
         $component = Livewire::test(GameBoard::class, ['level' => GameLevel::first()]);
         $session = GameSession::findOrFail($component->get('sessionId'));
-        $this->assertSame(['sessionId', 'questionNumber'], array_keys($component->snapshot['data']));
+        $this->assertSame(['sessionId', 'questionNumber', 'newAchievements'], array_keys($component->snapshot['data']));
         $component->call('answer', $session->current_question['answer'])->assertSee('Excellent')->call('nextQuestion')->assertSet('questionNumber', 2);
         $this->expectException(CannotUpdateLockedPropertyException::class);
         $component->set('sessionId', 999);
@@ -274,5 +275,122 @@ class FruitMathTest extends TestCase
         $other = User::create(['name' => 'Other', 'email' => 'history@example.test', 'password' => 'password', 'role' => 'parent']);
         $this->actingAs($other)->get(route('parent.history', $this->child()))->assertNotFound();
         $this->actingAs(User::where('role', 'admin')->first())->get(route('parent.history', $this->child()))->assertForbidden();
+    }
+
+
+    public function test_completing_a_level_unlocks_its_first_achievement(): void
+    {
+        $engine = app(GameEngine::class);
+        $child = $this->child();
+        $session = $engine->start($child, GameLevel::first());
+        $this->complete($session);
+        $achievement = \App\Models\Achievement::where('slug', 'apple-starter')->firstOrFail();
+        $this->assertDatabaseHas('child_achievements', ['child_profile_id' => $child->id, 'achievement_id' => $achievement->id]);
+        $this->assertGreaterThanOrEqual($achievement->xp_reward, $child->fresh()->xp);
+    }
+
+    public function test_child_can_change_avatar(): void
+    {
+        $this->loginParent();
+        $child = $this->child();
+
+        Livewire::test(ChildHome::class)
+            ->call('toggleAvatarPicker')
+            ->assertSet('showAvatarPicker', true)
+            ->call('selectAvatar', '🦁')
+            ->assertSet('showAvatarPicker', false);
+
+        $this->assertSame('🦁', $child->fresh()->avatar);
+
+        // Disallow arbitrary strings
+        Livewire::test(ChildHome::class)
+            ->call('selectAvatar', 'invalid_avatar');
+
+        $this->assertSame('🦁', $child->fresh()->avatar);
+    }
+
+    public function test_child_home_displays_trophy_cabinet(): void
+    {
+        $this->loginParent();
+        Livewire::test(ChildHome::class)
+            ->assertOk()
+            ->assertSee('Kabati la Tuzo na Beji')
+            ->assertSee('Apple Starter');
+    }
+
+    public function test_game_board_dispatches_sound_effects(): void
+    {
+        $this->loginParent();
+        $component = Livewire::test(GameBoard::class, ['level' => GameLevel::first()]);
+        $session = GameSession::findOrFail($component->get('sessionId'));
+        $correctAnswer = $session->current_question['answer'];
+
+        $component->call('answer', $correctAnswer)
+            ->assertDispatched('fx:correct');
+
+        $wrongAnswer = collect($session->current_question['options'])->first(fn ($v) => (string) $v !== (string) $correctAnswer);
+        $component->call('nextQuestion');
+        $session->refresh();
+        $wrongAnswer = collect($session->current_question['options'])->first(fn ($v) => (string) $v !== (string) $session->current_question['answer']);
+        $component->call('answer', $wrongAnswer)
+            ->assertDispatched('fx:wrong');
+    }
+
+    public function test_parent_dashboard_has_animated_background_and_language_toggle(): void
+    {
+        $this->loginParent();
+        $response = $this->get('/parent')->assertOk();
+        $response->assertSee('fruit-garden.jpg');
+        $response->assertSee(route('language', 'sw'));
+        $response->assertSee(route('parent.history', $this->child()));
+    }
+
+    public function test_parent_history_has_animated_background(): void
+    {
+        $this->loginParent();
+        $response = $this->get(route('parent.history', $this->child()))->assertOk();
+        $response->assertSee('fruit-garden.jpg');
+        $response->assertSee('Parent Dashboard');
+    }
+
+    public function test_user_can_switch_locale_between_english_and_swahili(): void
+    {
+        $this->loginParent();
+        $this->get('/language/sw')->assertSessionHas('locale', 'sw');
+        app()->setLocale('sw');
+        $generator = app(QuestionGenerator::class);
+        $qSw = $generator->generate('comparison', 1);
+        $this->assertSame('Chagua alama sahihi.', $qSw['instruction']);
+
+        $this->get('/language/en')->assertSessionHas('locale', 'en');
+        app()->setLocale('en');
+        $qEn = $generator->generate('comparison', 1);
+        $this->assertSame('Choose the correct sign.', $qEn['instruction']);
+    }
+
+    public function test_no_pages_render_sticky_header_nav(): void
+    {
+        $this->get('/')->assertOk()->assertDontSee('<nav', false)->assertSee('FRUIT MATH');
+        $this->get('/login')->assertOk()->assertDontSee('<nav', false);
+        $this->get('/register')->assertOk()->assertDontSee('<nav', false);
+
+        $this->loginParent();
+        $this->get('/parent')->assertOk()->assertDontSee('<nav', false);
+    }
+
+    public function test_website_wide_audio_asset_and_controls_render(): void
+    {
+        $this->assertFileExists(public_path('audio/fruit-garden.wav'));
+        $this->assertGreaterThan(1_000_000, filesize(public_path('audio/fruit-garden.wav')));
+
+        // Floating global music control renders across website
+        $this->get('/')->assertOk()->assertSee('data-global-music-toggle', false);
+        $this->get('/login')->assertOk()->assertSee('data-global-music-toggle', false);
+
+        $this->loginParent();
+        $this->get('/parent')->assertOk()->assertSee('data-global-music-toggle', false);
+
+        // Game board renders dedicated music control
+        $this->get('/level/'.GameLevel::first()->id)->assertOk()->assertSee('data-music-toggle', false);
     }
 }

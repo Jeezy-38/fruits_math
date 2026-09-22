@@ -28,14 +28,14 @@ class QuestionGenerator
             $right = $tables[array_rand($tables)];
 
             return $operation === 'multiplication'
-             ? $this->q($operation, $left, $right, $left * $right, "$left groups of $right. How many altogether?")
-             : $this->q($operation, $left * $right, $right, $left, 'Share '.($left * $right)." fruits equally between $right baskets.");
+             ? $this->q($operation, $left, $right, $left * $right, app()->getLocale() === 'sw' ? "Vikundi $left vya $right. Jumla ni ngapi?" : "$left groups of $right. How many altogether?")
+             : $this->q($operation, $left * $right, $right, $left, app()->getLocale() === 'sw' ? "Gawa matunda ".($left * $right)." sawa kwa vikapu $right." : 'Share '.($left * $right)." fruits equally between $right baskets.");
         }
         if ($operation === 'subtraction') {
             [$left,$right] = [max($left, $right), min($left, $right)];
         }
         if ($operation === 'comparison') {
-            return $this->q($operation, $left, $right, $left === $right ? '=' : ($left > $right ? '>' : '<'), 'Choose the correct sign.', ['options' => ['<', '>', '=']]);
+            return $this->q($operation, $left, $right, $left === $right ? '=' : ($left > $right ? '>' : '<'), __('game.comparison_instruction'), ['options' => ['<', '>', '=']]);
         }
         $answer = match ($operation) {
             'counting' => $left,'subtraction' => $left - $right,default => $left + $right
@@ -121,7 +121,7 @@ class QuestionGenerator
         $l = random_int(1, $m);
         $r = random_int(1, $m);
 
-        return $this->q('multiplication', $l, $r, $l * $r, "$l groups of $r. How many altogether?");
+        return $this->q('multiplication', $l, $r, $l * $r, app()->getLocale() === 'sw' ? "Vikundi $l vya $r. Jumla ni ngapi?" : "$l groups of $r. How many altogether?");
     }
 
     private function division($level)
@@ -129,7 +129,7 @@ class QuestionGenerator
         $r = random_int(2, $level < 4 ? 5 : 10);
         $a = random_int(1, $level < 4 ? 5 : 10);
 
-        return $this->q('division', $r * $a, $r, $a, 'Share '.($r * $a)." fruits equally between $r baskets.");
+        return $this->q('division', $r * $a, $r, $a, app()->getLocale() === 'sw' ? "Gawa matunda ".($r * $a)." sawa kwa vikapu $r." : 'Share '.($r * $a)." fruits equally between $r baskets.");
     }
 
     private function fractions($level)
@@ -144,7 +144,7 @@ class QuestionGenerator
             $pool[] = '1/3';
         }
 
-return array_merge($this->q('fractions', $n, $d, $a, 'What fraction is shaded?'), ['options' => $this->options($a, $pool), 'numerator' => $n, 'denominator' => $d]);
+        return array_merge($this->q('fractions', $n, $d, $a, app()->getLocale() === 'sw' ? 'Sehemu gani imepakwa rangi?' : 'What fraction is shaded?'), ['options' => $this->options($a, $pool), 'numerator' => $n, 'denominator' => $d]);
     }
 
     private function money($level)
@@ -154,7 +154,9 @@ return array_merge($this->q('fractions', $n, $d, $a, 'What fraction is shaded?')
         $qty = random_int(1, $level < 3 ? 4 : 8);
         $a = $price * $qty;
 
-        return array_merge($this->q('money', $qty, $price, $a, "Buy $qty $f(s) at TZS ".number_format($price).' each. How much?'), ['fruit' => $f, 'price' => $price, 'quantity' => $qty]);
+        $msg = app()->getLocale() === 'sw' ? "Nunua $qty ya $f kwa TZS ".number_format($price)." kila moja. Jumla ni shilingi ngapi?" : "Buy $qty $f(s) at TZS ".number_format($price).' each. How much?';
+
+        return array_merge($this->q('money', $qty, $price, $a, $msg), ['fruit' => $f, 'price' => $price, 'quantity' => $qty]);
     }
 
     private function time($level)
@@ -164,7 +166,7 @@ return array_merge($this->q('fractions', $n, $d, $a, 'What fraction is shaded?')
         $a = sprintf('%d:%02d', $h, $mins);
         $pool = [$a, sprintf('%d:%02d', ($h % 12) + 1, $mins), sprintf('%d:%02d', $h, $mins === 0 ? 30 : 0), sprintf('%d:%02d', (($h + 10) % 12) + 1, $mins)];
 
-        return array_merge($this->q('time', $h, $mins, $a, 'What time is shown?'), ['options' => $this->options($a, $pool), 'hour' => $h, 'minute' => $mins]);
+        return array_merge($this->q('time', $h, $mins, $a, app()->getLocale() === 'sw' ? 'Saa inaonyesha saa ngapi?' : 'What time is shown?'), ['options' => $this->options($a, $pool), 'hour' => $h, 'minute' => $mins]);
     }
 
     private function shapes($level)
@@ -173,7 +175,7 @@ return array_merge($this->q('fractions', $n, $d, $a, 'What fraction is shaded?')
         [$shape,$sides] = $shapes[array_rand($shapes)];
         $pool = array_column($shapes, 0);
 
-        return array_merge($this->q('shapes', 0, 0, $shape, 'Which shape is this?'), ['options' => $this->options($shape, $pool), 'shape' => $shape, 'sides' => $sides]);
+        return array_merge($this->q('shapes', 0, 0, $shape, app()->getLocale() === 'sw' ? 'Hili ni umbo gani?' : 'Which shape is this?'), ['options' => $this->options($shape, $pool), 'shape' => $shape, 'sides' => $sides]);
     }
 
     private function wordProblem($level)
@@ -198,6 +200,6 @@ return array_merge($this->q('fractions', $n, $d, $a, 'What fraction is shaded?')
             $r = random_int(1,$m);
         }$a = $l > $r ? '>' : '<';
 
-        return array_merge($this->q('comparison',$l,$r,$a,'Choose the correct sign.'),['options' => ['<', '>', '=']]);
+        return array_merge($this->q('comparison',$l,$r,$a,__('game.comparison_instruction')),['options' => ['<', '>', '=']]);
     }
 }

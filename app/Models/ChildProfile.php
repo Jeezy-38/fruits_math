@@ -27,4 +27,9 @@ class ChildProfile extends Model
     {
         return $this->hasMany(GameSession::class);
     }
+
+    public function achievements()
+    {
+        return $this->belongsToMany(Achievement::class, 'child_achievements')->withPivot('earned_at');
+    }
 }

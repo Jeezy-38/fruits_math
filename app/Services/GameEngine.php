@@ -13,6 +13,15 @@ class GameEngine
     public function start(ChildProfile $child, GameLevel $level): GameSession
     {
         abort_unless($level->world?->is_active && $level->level_number <= $child->current_level, 403);
+
+        // Resume an unfinished attempt at this level instead of abandoning it on refresh/back.
+        $resumable = GameSession::whereNull('assignment_id')->whereNull('completed_at')
+            ->where('child_profile_id', $child->id)->where('game_level_id', $level->id)
+            ->latest('id')->first();
+        if ($resumable) {
+            return $resumable;
+        }
+
         $settings = ['title' => $level->name, 'icon' => $level->icon, 'difficulty' => $level->difficulty, 'rules' => [], 'target' => $level->required_score, 'reward' => $level->xp_reward];
         $operation = $level->operation;
         $total = $level->questions_count;
@@ -48,22 +57,21 @@ class GameEngine
         });
     }
 
-    public function advance(int $id, ChildProfile $child, int $number): void
+    public function advance(int $id, ChildProfile $child, int $number): array
     {
-        DB::transaction(function () use ($id, $child, $number) {
+        return DB::transaction(function () use ($id, $child, $number) {
             $session = GameSession::whereNull('assignment_id')->where('child_profile_id', $child->id)->lockForUpdate()->findOrFail($id);
             if ($session->completed_at || $session->question_number !== $number || ! $session->attempts()->where('question_number', $number)->exists()) {
-                return;
+                return [];
             }
             if ($number < $session->total_questions) {
                 $session->update(['question_number' => $number + 1, 'current_question' => app(QuestionGenerator::class)->forRules($session->operation, $session->settings['difficulty'], $session->settings['rules'])]);
 
-                return;
+                return [];
             }
             // All scoring and rewards come from persisted, first-answer attempts.
             $learner = ChildProfile::lockForUpdate()->findOrFail($child->id);
             $correct = $session->attempts()->where('is_correct', true)->count();
-            $percent = (int) round($correct / $session->total_questions * 100);
             $earned = 0;
             if ($session->game_level_id) {
                 $before = $learner->xp;
@@ -71,7 +79,11 @@ class GameEngine
                 $earned = $learner->xp - $before;
             }
             $this->recordActivity($learner, $session->total_questions, $earned);
-            $session->update(['correct_answers' => $correct, 'wrong_answers' => $session->total_questions - $correct, 'score' => $correct * 10, 'xp_earned' => $earned, 'completed_at' => now(), 'current_question' => null]);
+            $newAchievements = app(AchievementService::class)->checkAndAward($learner);
+            $achievementXp = array_sum(array_map(fn ($a) => $a->xp_reward, $newAchievements));
+            $session->update(['correct_answers' => $correct, 'wrong_answers' => $session->total_questions - $correct, 'score' => $correct * 10, 'xp_earned' => $earned + $achievementXp, 'completed_at' => now(), 'current_question' => null]);
+
+            return $newAchievements;
         });
     }
 

@@ -1,66 +1,129 @@
-// One player per mounted game; Livewire question updates keep the same audio.
-let player = null;
+// Universal Background Music Manager for Fruit Math
 const preferenceKey = 'fruit-math-music-muted';
-function mount(element) {
-    const audio = element.querySelector('audio');
-    const button = element.querySelector('[data-music-toggle]');
-    let muted = false;
-    let disposed = false;
-    try { muted = localStorage.getItem(preferenceKey) === 'true'; } catch {}
-    audio.volume = 0.3;
-    const active = () => !disposed && element.closest('[data-game-active="true"]') && !document.hidden;
-    const label = () => {
-        const playing = !audio.paused && !muted;
-        const text = playing ? '♫ Mute music' : muted ? '♫ Music off' : '♫ Play music';
-        if (button.textContent !== text) button.textContent = text;
-        button.setAttribute('aria-label', playing ? 'Mute background music' : 'Play background music');
-        button.setAttribute('aria-pressed', String(playing));
-    };
-    const play = () => {
-        if (!active() || muted) return;
-        audio.play().then(() => {
-            if (!active() || muted) audio.pause();
-            label();
-        }).catch(label); // Browser may require the first tap before allowing sound.
-    };
-    const gesture = event => { if (!button.contains(event.target)) play(); };
-    const toggle = () => {
-        muted = !audio.paused && !muted;
-        try { localStorage.setItem(preferenceKey, String(muted)); } catch {}
-        if (muted) audio.pause(); else play();
-        label();
-    };
-    const visibility = () => { if (document.hidden) audio.pause(); else play(); label(); };
-    button.addEventListener('click', toggle);
-    document.addEventListener('pointerdown', gesture);
-    document.addEventListener('keydown', gesture);
-    document.addEventListener('visibilitychange', visibility);
-    audio.addEventListener('playing', label);
-    audio.addEventListener('pause', label);
-    label(); play();
-    return { element, destroy() {
-        disposed = true;
-        audio.pause(); audio.currentTime = 0;
-        button.removeEventListener('click', toggle);
-        document.removeEventListener('pointerdown', gesture);
-        document.removeEventListener('keydown', gesture);
-        document.removeEventListener('visibilitychange', visibility);
-        audio.removeEventListener('playing', label);
-        audio.removeEventListener('pause', label);
-    }};
+const audioSrc = '/audio/fruit-garden.wav';
+
+class GlobalMusicManager {
+    constructor() {
+        this.audio = null;
+        this.muted = false;
+        try {
+            this.muted = localStorage.getItem(preferenceKey) === 'true';
+        } catch {
+            this.muted = false;
+        }
+        this.init();
+    }
+
+    init() {
+        if (!this.audio && typeof Audio !== 'undefined') {
+            this.audio = new Audio(audioSrc);
+            this.audio.loop = true;
+            this.audio.volume = 0.28;
+            this.audio.preload = 'none';
+
+            this.audio.addEventListener('playing', () => this.updateUI());
+            this.audio.addEventListener('pause', () => this.updateUI());
+        }
+
+        // Browser policy: start playing on first user interaction if not muted
+        const gesture = () => {
+            if (!this.muted && this.audio && this.audio.paused) {
+                this.play();
+            }
+        };
+
+        document.addEventListener('pointerdown', gesture, { passive: true });
+        document.addEventListener('keydown', gesture, { passive: true });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (this.audio && !this.audio.paused) this.audio.pause();
+            } else {
+                if (!this.muted && this.audio && this.audio.paused) this.play();
+            }
+        });
+
+        const bindAll = () => this.syncButtons();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bindAll, { once: true });
+        } else {
+            bindAll();
+        }
+
+        document.addEventListener('livewire:navigated', () => {
+            this.syncButtons();
+            if (!this.muted && this.audio && this.audio.paused) this.play();
+        });
+
+        new MutationObserver(bindAll).observe(document.body, { childList: true, subtree: true });
+    }
+
+    play() {
+        if (this.muted || !this.audio) return;
+        this.audio.play().catch(() => {});
+        this.updateUI();
+    }
+
+    pause() {
+        if (!this.audio) return;
+        this.audio.pause();
+        this.updateUI();
+    }
+
+    toggle() {
+        this.muted = !this.muted;
+        try {
+            localStorage.setItem(preferenceKey, String(this.muted));
+        } catch {}
+
+        if (this.muted) {
+            this.pause();
+        } else {
+            this.play();
+        }
+        this.updateUI();
+    }
+
+    syncButtons() {
+        const buttons = document.querySelectorAll('[data-music-toggle], [data-global-music-toggle]');
+        buttons.forEach(btn => {
+            if (btn._musicBound) return;
+            btn._musicBound = true;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggle();
+            });
+        });
+        this.updateUI();
+    }
+
+    updateUI() {
+        const isPlaying = this.audio && !this.audio.paused && !this.muted;
+        const buttons = document.querySelectorAll('[data-music-toggle], [data-global-music-toggle]');
+        const isSw = document.documentElement.lang === 'sw';
+
+        buttons.forEach(btn => {
+            btn.setAttribute('aria-pressed', String(isPlaying));
+            btn.setAttribute('aria-label', isPlaying ? (isSw ? 'Zima muziki' : 'Mute music') : (isSw ? 'Washa muziki' : 'Play music'));
+
+            const iconEl = btn.querySelector('.music-icon');
+            if (iconEl) {
+                iconEl.textContent = isPlaying ? '🎵' : '🔇';
+            }
+
+            const labelEl = btn.querySelector('.music-label');
+            if (labelEl) {
+                labelEl.textContent = isPlaying
+                    ? (isSw ? 'Muziki: Unalia' : 'Music: On')
+                    : (isSw ? 'Muziki: Umezimwa' : 'Music: Off');
+            } else {
+                btn.innerHTML = isPlaying
+                    ? '<span>♫ ' + (isSw ? 'Muziki' : 'Music') + '</span>'
+                    : '<span>🔇 ' + (isSw ? 'Muziki' : 'Music') + '</span>';
+            }
+        });
+    }
 }
-function sync() {
-    const element = document.querySelector('[data-game-active="true"] [data-game-music]');
-    if (player && player.element !== element) { player.destroy(); player = null; }
-    if (element && !player) player = mount(element);
-    document.querySelectorAll('[data-game-active="false"] [data-game-music]').forEach(el => { el.hidden = true; });
-}
-function init() {
-    sync();
-    new MutationObserver(sync).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-game-active'] });
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-else init();
-window.addEventListener('pagehide', () => { if (player) player.destroy(); player = null; });
-window.addEventListener('pageshow', sync);
-document.addEventListener('livewire:navigating', () => { if (player) player.destroy(); player = null; });
+
+window.FruitMusic = new GlobalMusicManager();
