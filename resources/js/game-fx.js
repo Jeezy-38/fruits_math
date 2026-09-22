@@ -231,4 +231,10 @@ function checkAutoCelebrate() {
 }
 document.addEventListener('DOMContentLoaded', checkAutoCelebrate);
 document.addEventListener('livewire:navigated', checkAutoCelebrate);
-new MutationObserver(checkAutoCelebrate).observe(document.body, { childList: true, subtree: true });
+if (typeof window !== 'undefined') {
+    document.addEventListener('livewire:init', () => {
+        if (window.Livewire && window.Livewire.hook) {
+            window.Livewire.hook('morph.updated', checkAutoCelebrate);
+        }
+    });
+}

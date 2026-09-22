@@ -38,7 +38,9 @@
     @livewireScripts
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'));
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let r of registrations) { r.unregister(); }
+            });
         }
     </script>
 </body>

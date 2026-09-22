@@ -32,8 +32,8 @@ class GlobalMusicManager {
             }
         };
 
-        document.addEventListener('pointerdown', gesture, { passive: true });
-        document.addEventListener('keydown', gesture, { passive: true });
+        document.addEventListener('pointerdown', gesture, { passive: true, once: true });
+        document.addEventListener('keydown', gesture, { passive: true, once: true });
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
@@ -43,19 +43,27 @@ class GlobalMusicManager {
             }
         });
 
-        const bindAll = () => this.syncButtons();
+        // Clean event delegation for toggle buttons (prevents DOM thrashing & MutationObserver loops)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-music-toggle], [data-global-music-toggle]');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggle();
+            }
+        });
+
+        const sync = () => this.updateUI();
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', bindAll, { once: true });
+            document.addEventListener('DOMContentLoaded', sync, { once: true });
         } else {
-            bindAll();
+            sync();
         }
 
         document.addEventListener('livewire:navigated', () => {
-            this.syncButtons();
+            this.updateUI();
             if (!this.muted && this.audio && this.audio.paused) this.play();
         });
-
-        new MutationObserver(bindAll).observe(document.body, { childList: true, subtree: true });
     }
 
     play() {
@@ -84,43 +92,40 @@ class GlobalMusicManager {
         this.updateUI();
     }
 
-    syncButtons() {
-        const buttons = document.querySelectorAll('[data-music-toggle], [data-global-music-toggle]');
-        buttons.forEach(btn => {
-            if (btn._musicBound) return;
-            btn._musicBound = true;
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.toggle();
-            });
-        });
-        this.updateUI();
-    }
-
     updateUI() {
         const isPlaying = this.audio && !this.audio.paused && !this.muted;
         const buttons = document.querySelectorAll('[data-music-toggle], [data-global-music-toggle]');
         const isSw = document.documentElement.lang === 'sw';
 
         buttons.forEach(btn => {
-            btn.setAttribute('aria-pressed', String(isPlaying));
-            btn.setAttribute('aria-label', isPlaying ? (isSw ? 'Zima muziki' : 'Mute music') : (isSw ? 'Washa muziki' : 'Play music'));
+            const targetPressed = String(isPlaying);
+            if (btn.getAttribute('aria-pressed') !== targetPressed) {
+                btn.setAttribute('aria-pressed', targetPressed);
+            }
+
+            const targetLabel = isPlaying
+                ? (isSw ? 'Zima muziki' : 'Mute music')
+                : (isSw ? 'Washa muziki' : 'Play music');
+            if (btn.getAttribute('aria-label') !== targetLabel) {
+                btn.setAttribute('aria-label', targetLabel);
+            }
 
             const iconEl = btn.querySelector('.music-icon');
             if (iconEl) {
-                iconEl.textContent = isPlaying ? '🎵' : '🔇';
+                const targetIcon = isPlaying ? '🎵' : '🔇';
+                if (iconEl.textContent !== targetIcon) {
+                    iconEl.textContent = targetIcon;
+                }
             }
 
             const labelEl = btn.querySelector('.music-label');
             if (labelEl) {
-                labelEl.textContent = isPlaying
+                const targetText = isPlaying
                     ? (isSw ? 'Muziki: Unalia' : 'Music: On')
                     : (isSw ? 'Muziki: Umezimwa' : 'Music: Off');
-            } else {
-                btn.innerHTML = isPlaying
-                    ? '<span>♫ ' + (isSw ? 'Muziki' : 'Music') + '</span>'
-                    : '<span>🔇 ' + (isSw ? 'Muziki' : 'Music') + '</span>';
+                if (labelEl.textContent !== targetText) {
+                    labelEl.textContent = targetText;
+                }
             }
         });
     }
