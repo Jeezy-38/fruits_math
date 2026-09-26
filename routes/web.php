@@ -15,6 +15,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', Dashboard::class)->name('home');
+Route::get('/intro', function () {
+    return view('intro');
+})->name('intro');
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'loginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
@@ -38,6 +41,7 @@ Route::middleware(['auth', 'role:parent'])->group(function () {
     Route::get('/child', ChildHome::class)->name('child.home');
     Route::get('/map', WorldMap::class)->name('world.map');
     Route::get('/level/{level}', GameBoard::class)->name('game.level');
+    Route::get('/quiz/{quiz}', GameBoard::class)->name('game.quiz');
 });
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin', AdminDashboard::class)->name('admin.dashboard');

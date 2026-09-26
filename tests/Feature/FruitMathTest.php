@@ -72,7 +72,7 @@ class FruitMathTest extends TestCase
 
     public function test_public_and_authenticated_pages_render(): void
     {
-        foreach (['/', '/login', '/register'] as $url) {
+        foreach (['/', '/intro', '/login', '/register'] as $url) {
             $this->get($url)->assertOk();
         }
         $this->loginParent();
@@ -82,6 +82,20 @@ class FruitMathTest extends TestCase
         $this->actingAs(User::where('role', 'admin')->first());
         $this->get('/admin')->assertOk();
         $this->get('/admin/curriculum')->assertOk();
+    }
+
+    public function test_streetcode_intro_page_and_component_render(): void
+    {
+        $this->assertFileExists(public_path('images/streetcode-logo.png'));
+        $this->get('/intro')->assertOk()
+            ->assertSee('StreetCode', false)
+            ->assertSee('FRUIT MATH')
+            ->assertSee('streetcode-progress-bar', false)
+            ->assertDontSee('<nav', false);
+
+        $this->get('/')->assertOk()
+            ->assertSee('StreetCode', false)
+            ->assertSee('streetcode-intro-screen', false);
     }
 
     public function test_questions_always_offer_exactly_one_correct_answer(): void
@@ -251,8 +265,8 @@ class FruitMathTest extends TestCase
     {
         foreach (['parent', 'admin'] as $role) {
             $this->post('/login', ['email' => $role.'@fruitmath.test', 'password' => 'password'])->assertRedirect('/'.$role);
-            $this->assertAuthenticatedAs(User::where('role', $role)->first());
-            $this->post('/logout');
+            $this->post('/logout')->assertRedirect(route('home', ['skip_intro' => 1]));
+            $this->get(route('home', ['skip_intro' => 1]))->assertOk()->assertSee('data-skip="true"', false);
         }
     }
 
@@ -371,6 +385,7 @@ class FruitMathTest extends TestCase
     public function test_no_pages_render_sticky_header_nav(): void
     {
         $this->get('/')->assertOk()->assertDontSee('<nav', false)->assertSee('FRUIT MATH');
+        $this->get('/intro')->assertOk()->assertDontSee('<nav', false);
         $this->get('/login')->assertOk()->assertDontSee('<nav', false);
         $this->get('/register')->assertOk()->assertDontSee('<nav', false);
 
@@ -392,5 +407,92 @@ class FruitMathTest extends TestCase
 
         // Game board renders dedicated music control
         $this->get('/level/'.GameLevel::first()->id)->assertOk()->assertSee('data-music-toggle', false);
+    }
+
+    public function test_combined_quizzes_unlock_after_all_games_and_combine_all_cards(): void
+    {
+        $this->loginParent();
+        $child = $this->child();
+        session(['locale' => 'sw']);
+        app()->setLocale('sw');
+
+        // 1. When child has not completed all 11 games:
+        $child->update(['current_level' => 1]);
+        $this->get('/quiz/grand-champion')->assertForbidden();
+        $this->get('/child')->assertOk()->assertSee('Mitihani Mchanganyiko')->assertSee('Imefungwa');
+        $this->get('/map')->assertOk()->assertSee('Kisiwa Kimefungwa');
+
+        // 2. When child has completed all 11 games:
+        $child->update(['current_level' => 12]);
+        $this->assertTrue($child->hasCompletedAllGames());
+
+        $this->get('/child')->assertOk()->assertSee('Umecheza Michezo Yote!')->assertSee(route('game.quiz', 'grand-champion'));
+        $this->get('/map')->assertOk()->assertSee('Kisiwa cha Mitihani Mchanganyiko')->assertSee(route('game.quiz', 'grand-champion'));
+
+        // 3. Child can start and play a mixed quiz:
+        $this->get('/quiz/grand-champion')->assertOk();
+        $session = GameSession::where('child_profile_id', $child->id)->where('operation', 'mixed')->latest('id')->first();
+        $this->assertNotNull($session);
+        $this->assertSame(11, $session->total_questions);
+        $this->assertNull($session->game_level_id);
+
+        // 4. Questions combine multiple cards/operations across the quiz:
+        $engine = app(GameEngine::class);
+        $operationsSeen = [];
+        for ($n = 1; $n <= $session->total_questions; $n++) {
+            $session->refresh();
+            $q = $session->current_question;
+            $this->assertNotNull($q);
+            $operationsSeen[] = $q['operation'];
+            $engine->submit($session->id, $child, $n, $q['answer']);
+            $engine->advance($session->id, $child, $n);
+        }
+
+        // Verify that multiple diverse operations were asked in the quiz:
+        $this->assertGreaterThanOrEqual(5, count(array_unique($operationsSeen)));
+
+        // 5. Rewards are awarded upon quiz completion:
+        $session->refresh();
+        $child->refresh();
+        $this->assertNotNull($session->completed_at);
+        $this->assertSame(11, $session->correct_answers);
+        $this->assertGreaterThan(0, $child->xp);
+        $this->assertGreaterThan(0, $child->stars);
+    }
+
+    public function test_word_problems_can_be_answered_and_advances_to_next_question(): void
+    {
+        $this->loginParent();
+        $child = $this->child();
+        $child->update(['current_level' => 20]);
+        $level = GameLevel::where('operation', 'word-problems')->firstOrFail();
+
+        $component = Livewire::test(GameBoard::class, ['level' => $level]);
+        $this->assertSame(1, $component->get('questionNumber'));
+        $options = $component->viewData('options');
+        $this->assertNotEmpty($options);
+
+        // Before answering, next button is not yet visible
+        $this->assertFalse(str_contains($component->html(), 'nextQuestion'));
+
+        // Answer question 1
+        $component->call('answer', $options[0]);
+        $this->assertTrue(str_contains($component->html(), 'nextQuestion'));
+
+        // Advance to question 2
+        $component->call('nextQuestion');
+        $this->assertSame(2, $component->get('questionNumber'));
+
+        // Simulate page reload on question 2: verify questionNumber remains in sync with session
+        $reloaded = Livewire::test(GameBoard::class, ['level' => $level]);
+        $this->assertSame(2, $reloaded->get('questionNumber'));
+
+        $q2Options = $reloaded->viewData('options');
+        $this->assertNotEmpty($q2Options);
+        $reloaded->call('answer', $q2Options[0]);
+        $this->assertTrue(str_contains($reloaded->html(), 'nextQuestion'));
+
+        $reloaded->call('nextQuestion');
+        $this->assertSame(3, $reloaded->get('questionNumber'));
     }
 }

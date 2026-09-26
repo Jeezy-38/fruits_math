@@ -1,1 +1,29 @@
-{"name":"Fruit Math","short_name":"FruitMath","start_url":"/","display":"standalone","background_color":"#ecfdf5","theme_color":"#10b981","description":"A playful maths adventure for children.","icons":[]}
+{
+  "name": "Fruit Math",
+  "short_name": "FruitMath",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ecfdf5",
+  "theme_color": "#10b981",
+  "description": "A playful maths adventure for children.",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "id": "/",
+  "scope": "/",
+  "categories": [
+    "education",
+    "games"
+  ]
+}

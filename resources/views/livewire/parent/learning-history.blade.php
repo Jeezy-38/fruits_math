@@ -11,12 +11,25 @@
                     <span>Parent Dashboard</span>
                 </a>
 
-                {{-- Language Switcher --}}
-                <a href="{{ route('language', app()->getLocale() === 'sw' ? 'en' : 'sw') }}"
-                   class="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-2xl font-black text-xs shadow border border-slate-200/80 hover:scale-105 active:scale-95 transition flex items-center gap-1.5">
-                    <span>🌐</span>
-                    <span>{{ app()->getLocale() === 'sw' ? 'English' : 'Kiswahili' }}</span>
-                </a>
+                <div class="flex items-center gap-2">
+                    {{-- Language Switcher --}}
+                    <a href="{{ route('language', app()->getLocale() === 'sw' ? 'en' : 'sw') }}"
+                       class="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-2xl font-black text-xs shadow border border-slate-200/80 hover:scale-105 active:scale-95 transition flex items-center gap-1.5">
+                        <span>🌐</span>
+                        <span>{{ app()->getLocale() === 'sw' ? 'English' : 'Kiswahili' }}</span>
+                    </a>
+
+                    {{-- Logout Button --}}
+                    <form method="POST" action="{{ route('logout') }}" class="inline">
+                        @csrf
+                        <button type="submit"
+                                class="bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-3.5 sm:px-4 py-2 rounded-2xl font-black text-xs shadow border border-slate-200/80 hover:scale-105 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                                title="{{ app()->getLocale() === 'sw' ? 'Toka kwenye akaunti' : 'Log out' }}">
+                            <span>🚪</span>
+                            <span>{{ app()->getLocale() === 'sw' ? 'Toka' : 'Log out' }}</span>
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <div class="mt-4 flex items-center gap-4">

@@ -2,6 +2,10 @@ export default {
     content: ['./resources/**/*.blade.php', './app/Livewire/**/*.php'],
     theme: {
         extend: {
+            fontFamily: {
+                sans: ['Nunito', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+                display: ['Fredoka', 'Nunito', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
             keyframes: {
                 float: {
                     '0%, 100%': {transform: 'translateY(0) rotate(0deg)'},

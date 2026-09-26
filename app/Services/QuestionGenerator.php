@@ -186,9 +186,11 @@ class QuestionGenerator
         $b = random_int(1, $level < 3 ? 5 : 10);
         $fruit = $this->fruit();
         $ans = $a + $b;
-        $text = app()->getLocale() === 'sw' ? "$name ana $a $fruit. Anapewa $b zaidi. Sasa ana matunda mangapi?" : "$name has $a $fruit(s) and gets $b more. How many are there now?";
+        $swFruits = ['apple' => 'maapulo', 'banana' => 'ndizi', 'orange' => 'machungwa', 'mango' => 'maembe', 'strawberry' => 'strouberi'];
+        $fruitLabel = app()->getLocale() === 'sw' ? ($swFruits[$fruit] ?? $fruit) : "$fruit(s)";
+        $text = app()->getLocale() === 'sw' ? "$name ana $fruitLabel $a. Anapewa $b zaidi. Sasa ana matunda mangapi?" : "$name has $a $fruitLabel and gets $b more. How many are there now?";
 
-        return $this->q('word-problems', $a, $b, $ans, $text, ['story_name' => $name]);
+        return $this->q('word-problems', $a, $b, $ans, $text, ['story_name' => $name, 'fruit' => $fruit]);
     }
 
     private function comparison($level)

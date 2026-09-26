@@ -170,6 +170,24 @@
                         <div class="text-8xl drop-shadow-md animate-float">{{ ['circle'=>'⚪','triangle'=>'🔺','square'=>'⬜','rectangle'=>'▭','pentagon'=>'⬠','hexagon'=>'⬡'][$question['shape']] ?? '🔷' }}</div>
                     @elseif($operation==='comparison')
                         <div class="font-black text-6xl text-slate-800">{{ $left }} &nbsp; ? &nbsp; {{ $right }}</div>
+                    @elseif($operation==='word-problems')
+                        @php
+                            $fruitMap = ['apple'=>'🍎','banana'=>'🍌','orange'=>'🍊','mango'=>'🥭','strawberry'=>'🍓'];
+                            $fIcon = $fruitMap[$fruit] ?? '🍎';
+                        @endphp
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="flex flex-wrap items-center justify-center gap-3 md:gap-5">
+                                <div class="bg-amber-50/90 border-2 border-amber-300 rounded-3xl px-5 py-3 flex items-center gap-3 shadow-md hover:scale-105 transition-transform">
+                                    <span class="text-5xl md:text-6xl drop-shadow-md select-none">{{ $fIcon }}</span>
+                                    <span class="font-black text-4xl text-slate-800">{{ $left }}</span>
+                                </div>
+                                <span class="font-black text-4xl text-amber-500 animate-pulse">+</span>
+                                <div class="bg-emerald-50/90 border-2 border-emerald-300 rounded-3xl px-5 py-3 flex items-center gap-3 shadow-md hover:scale-105 transition-transform">
+                                    <span class="text-5xl md:text-6xl drop-shadow-md select-none">{{ $fIcon }}</span>
+                                    <span class="font-black text-4xl text-slate-800">{{ $right }}</span>
+                                </div>
+                            </div>
+                        </div>
                     @endif
                 </div>
 
@@ -207,10 +225,10 @@
                 {{-- Feedback Celebration & Next Question Button --}}
                 @if($correct!==null)
                     <div class="mt-6 text-2xl font-black animate-pop {{ $correct?'text-green-600':'text-orange-600' }}">
-                        {{ $correct ? '🎉 Excellent! Safi sana! 🌟' : '💪 Almost! The answer is '.$answer }}
+                        {{ $correct ? (app()->getLocale() === 'sw' ? '🎉 Umepatia! Safi sana! 🌟' : '🎉 Excellent! Great job! 🌟') : (app()->getLocale() === 'sw' ? '💪 Karibu upatie! Jibu sahihi ni '.$answer : '💪 Almost! The answer is '.$answer) }}
                     </div>
-                    <button wire:click="nextQuestion" class="mt-5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-900 font-black text-2xl px-10 py-5 rounded-3xl shadow-[0_8px_0_#b45309] active:translate-y-2 active:shadow-none transition-all">
-                        {{ $questionNumber===$totalQuestions ? '🎁 Maliza & Fungua Zawadi! ➔' : 'Swali Linalofuata ➔' }}
+                    <button wire:click="nextQuestion" class="mt-5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-900 font-black text-2xl px-10 py-5 rounded-3xl shadow-[0_8px_0_#b45309] active:translate-y-2 active:shadow-none transition-all cursor-pointer">
+                        {{ $questionNumber===$totalQuestions ? (app()->getLocale() === 'sw' ? '🎁 Maliza & Fungua Zawadi! ➔' : '🎁 Finish & Open Chest! ➔') : (app()->getLocale() === 'sw' ? 'Swali Linalofuata ➔' : 'Next Question ➔') }}
                     </button>
                 @endif
             </div>

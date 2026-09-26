@@ -74,6 +74,16 @@ Alternatively, `npm install` then `npm run build` works with the package manifes
 
 Back up your database, preserve your existing `.env`, install dependencies and run `php artisan migrate`. Do not use `migrate:fresh` on existing data. Finish or restart any old in-progress games: the new server-owned question state is only available for new sessions. Old completed results remain intact. Build or copy the included `public/build` assets, then run `php artisan optimize:clear`.
 
+## Installable app (PWA)
+
+Build with `npm run build` and serve `public/` over HTTPS (localhost also works). The production bundle registers `/service-worker.js`; the Vite development bundle does not register it. The manifest includes app icons derived from the existing StreetCode logo and opens the app in a standalone window.
+
+On supported browsers, an **Install Fruit Math** button appears when the browser offers installation. On iPhone/iPad, use Safari’s Share menu → **Add to Home Screen**. Installed users do not see the install button.
+
+After an online visit activates the worker, disconnected navigation shows the public reconnect page. Gameplay and answer submission still require a connection. Account pages, child data, and API responses are never stored in the service-worker cache. Deploy the manifest, icons, worker, offline page and rebuilt assets together. Bump the worker’s cache version when changing the offline page. Worker updates activate without reloading an in-progress game.
+
+To check manually: open the production build, inspect Application → Manifest and Service Workers in browser developer tools, verify installation, then switch the browser offline and navigate to another page. Reconnect and use **Try again**. Inspect Cache Storage to confirm that only `/offline.html` is cached.
+
 ## Current limits
 
 - A browser refresh starts a new game; resuming unfinished sessions is not implemented.

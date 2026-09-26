@@ -46,7 +46,7 @@ class AuthController extends Controller
         $r->session()->invalidate();
         $r->session()->regenerateToken();
 
-        return redirect()->route('home');
+        return redirect()->route('home', ['skip_intro' => 1]);
     }
 
     private function home(User $u)

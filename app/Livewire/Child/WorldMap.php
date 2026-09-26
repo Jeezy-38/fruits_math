@@ -14,6 +14,18 @@ class WorldMap extends Component
         abort_unless($child, 403);
         $worlds = GameWorld::where('is_active', true)->with(['levels.progress' => fn ($q) => $q->where('child_profile_id', $child->id)])->orderBy('position')->get();
 
-        return view('livewire.child.world-map', compact('child', 'worlds'))->layout('layouts.app');
+        $quizzes = app(\App\Services\QuizService::class)->all();
+        $hasCompletedAll = $child->hasCompletedAllGames();
+        $completedCount = $child->completedGamesCount();
+        $totalCount = $child->totalGamesCount();
+
+        $completedQuizzes = \App\Models\GameSession::where('child_profile_id', $child->id)
+            ->whereNull('game_level_id')
+            ->where('operation', 'mixed')
+            ->whereNotNull('completed_at')
+            ->get()
+            ->groupBy(fn ($s) => $s->settings['quiz_key'] ?? '');
+
+        return view('livewire.child.world-map', compact('child', 'worlds', 'quizzes', 'hasCompletedAll', 'completedCount', 'totalCount', 'completedQuizzes'))->layout('layouts.app');
     }
 }

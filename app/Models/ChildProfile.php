@@ -32,4 +32,24 @@ class ChildProfile extends Model
     {
         return $this->belongsToMany(Achievement::class, 'child_achievements')->withPivot('earned_at');
     }
+
+    public function totalGamesCount(): int
+    {
+        return GameLevel::whereHas('world', fn ($q) => $q->where('is_active', true))->count();
+    }
+
+    public function completedGamesCount(): int
+    {
+        return $this->progress()->where('completed', true)->count();
+    }
+
+    public function hasCompletedAllGames(): bool
+    {
+        $total = $this->totalGamesCount();
+        if ($total === 0) {
+            return false;
+        }
+
+        return $this->current_level > $total || $this->completedGamesCount() >= $total;
+    }
 }

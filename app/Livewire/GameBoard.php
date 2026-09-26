@@ -18,18 +18,26 @@ class GameBoard extends Component
 
     public array $newAchievements = [];
 
-    public function mount(GameLevel $level): void
+    public function mount(?GameLevel $level = null, ?string $quiz = null): void
     {
         $child = CurrentChild::get();
         abort_unless($child, 403);
-        $session = app(GameEngine::class)->start($child, $level);
+        if ($quiz) {
+            $session = app(GameEngine::class)->startQuiz($child, $quiz);
+        } else {
+            abort_unless($level && $level->exists, 404);
+            $session = app(GameEngine::class)->start($child, $level);
+        }
         $this->sessionId = $session->id;
+        $this->questionNumber = $session->question_number;
     }
 
     public function answer(int|string $value): void
     {
         $child = CurrentChild::get();
         abort_unless($child, 403);
+        $session = app(GameEngine::class)->owned($this->sessionId, $child);
+        $this->questionNumber = $session->question_number;
         app(GameEngine::class)->submit($this->sessionId, $child, $this->questionNumber, $value);
         $attempt = app(GameEngine::class)->owned($this->sessionId, $child)
             ->attempts()->where('question_number', $this->questionNumber)->first();
@@ -44,6 +52,8 @@ class GameBoard extends Component
     {
         $child = CurrentChild::get();
         abort_unless($child, 403);
+        $session = app(GameEngine::class)->owned($this->sessionId, $child);
+        $this->questionNumber = $session->question_number;
         $earned = app(GameEngine::class)->advance($this->sessionId, $child, $this->questionNumber);
         $session = app(GameEngine::class)->owned($this->sessionId, $child);
         $this->questionNumber = $session->question_number;
@@ -68,11 +78,11 @@ class GameBoard extends Component
         $attempt = $session->attempts()->where('question_number', $session->question_number)->first();
         $pct = $session->total_questions > 0 ? round($session->correct_answers / $session->total_questions * 100) : 0;
         $starsEarned = $pct >= 90 ? 3 : ($pct >= 75 ? 2 : ($pct >= 60 ? 1 : 0));
-        $worldSlug = $session->level?->world?->slug ?? 'fruit-garden';
+        $worldSlug = $session->settings['world'] ?? $session->level?->world?->slug ?? 'fruit-garden';
 
         return view('livewire.game-board', [
             'title' => $session->settings['title'], 'icon' => $session->settings['icon'],
-            'operation' => $session->operation, 'totalQuestions' => $session->total_questions,
+            'operation' => $question['operation'] ?? $session->operation, 'totalQuestions' => $session->total_questions,
             'score' => $session->attempts()->where('is_correct', true)->count() * 10,
             'correctCount' => $session->correct_answers, 'finished' => (bool) $session->completed_at,
             'passed' => $session->completed_at && $pct >= $session->settings['target'],

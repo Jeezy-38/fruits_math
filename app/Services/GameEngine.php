@@ -35,6 +35,53 @@ class GameEngine
         ]);
     }
 
+    public function startQuiz(ChildProfile $child, string $quizKey): GameSession
+    {
+        $quiz = app(QuizService::class)->find($quizKey);
+        abort_unless($quiz, 404);
+        abort_unless($child->hasCompletedAllGames(), 403);
+
+        // Resume an unfinished attempt at this quiz instead of abandoning it on refresh/back.
+        $resumable = GameSession::whereNull('assignment_id')->whereNull('completed_at')
+            ->where('child_profile_id', $child->id)
+            ->whereNull('game_level_id')
+            ->where('operation', 'mixed')
+            ->latest('id')->first();
+        if ($resumable && ($resumable->settings['quiz_key'] ?? '') === $quizKey) {
+            return $resumable;
+        }
+
+        $queue = app(QuizService::class)->buildOperationQueue($quiz['operations'], $quiz['questions_count']);
+        $settings = [
+            'quiz_key' => $quizKey,
+            'title' => $quiz['title'],
+            'icon' => $quiz['icon'],
+            'difficulty' => $quiz['difficulty'],
+            'rules' => [],
+            'target' => $quiz['target'],
+            'reward' => $quiz['reward'],
+            'operations' => $quiz['operations'],
+            'operation_queue' => $queue,
+            'world' => $quiz['world'],
+        ];
+
+        $session = GameSession::create([
+            'child_profile_id' => $child->id,
+            'game_level_id' => null,
+            'operation' => 'mixed',
+            'total_questions' => $quiz['questions_count'],
+            'settings' => $settings,
+            'question_number' => 1,
+            'started_at' => now(),
+            'current_question' => null,
+        ]);
+
+        $session->current_question = app(QuizService::class)->questionFor($session, 1);
+        $session->save();
+
+        return $session;
+    }
+
     public function owned(int $id, ChildProfile $child): GameSession
     {
         return GameSession::whereNull('assignment_id')->where('child_profile_id', $child->id)->findOrFail($id);
@@ -50,7 +97,7 @@ class GameEngine
             $question = $session->current_question;
             abort_unless(in_array((string) $answer, array_map('strval', $question['options']), true), 422);
             $session->attempts()->create([
-                'question_number' => $number, 'operation' => $session->operation, 'question_data' => $question,
+                'question_number' => $number, 'operation' => $question['operation'] ?? $session->operation, 'question_data' => $question,
                 'expected_answer' => (string) $question['answer'], 'given_answer' => (string) $answer,
                 'is_correct' => (string) $answer === (string) $question['answer'],
             ]);
@@ -65,7 +112,11 @@ class GameEngine
                 return [];
             }
             if ($number < $session->total_questions) {
-                $session->update(['question_number' => $number + 1, 'current_question' => app(QuestionGenerator::class)->forRules($session->operation, $session->settings['difficulty'], $session->settings['rules'])]);
+                $nextQuestion = $session->operation === 'mixed'
+                    ? app(QuizService::class)->questionFor($session, $number + 1)
+                    : app(QuestionGenerator::class)->forRules($session->operation, $session->settings['difficulty'], $session->settings['rules']);
+
+                $session->update(['question_number' => $number + 1, 'current_question' => $nextQuestion]);
 
                 return [];
             }
@@ -77,6 +128,16 @@ class GameEngine
                 $before = $learner->xp;
                 app(ProgressService::class)->complete($learner, GameLevel::findOrFail($session->game_level_id), $correct, $session->total_questions);
                 $earned = $learner->xp - $before;
+            } else {
+                $pct = (int) round(($correct / max($session->total_questions, 1)) * 100);
+                $stars = $pct >= 90 ? 3 : ($pct >= 75 ? 2 : ($pct >= 60 ? 1 : 0));
+                $target = (int) ($session->settings['target'] ?? 60);
+                if ($pct >= $target) {
+                    $earned = (int) ($session->settings['reward'] ?? 150);
+                    $learner->xp += $earned;
+                    $learner->stars += $stars;
+                    $learner->save();
+                }
             }
             $this->recordActivity($learner, $session->total_questions, $earned);
             $newAchievements = app(AchievementService::class)->checkAndAward($learner);

@@ -39,6 +39,18 @@ class ChildHome extends Component
         $achievements = Achievement::all();
         $earnedIds = $child->achievements()->pluck('achievements.id')->all();
 
-        return view('livewire.child.home', compact('child', 'next', 'achievements', 'earnedIds'))->layout('layouts.app');
+        $quizzes = app(\App\Services\QuizService::class)->all();
+        $hasCompletedAll = $child->hasCompletedAllGames();
+        $completedCount = $child->completedGamesCount();
+        $totalCount = $child->totalGamesCount();
+
+        $completedQuizzes = \App\Models\GameSession::where('child_profile_id', $child->id)
+            ->whereNull('game_level_id')
+            ->where('operation', 'mixed')
+            ->whereNotNull('completed_at')
+            ->get()
+            ->groupBy(fn ($s) => $s->settings['quiz_key'] ?? '');
+
+        return view('livewire.child.home', compact('child', 'next', 'achievements', 'earnedIds', 'quizzes', 'hasCompletedAll', 'completedCount', 'totalCount', 'completedQuizzes'))->layout('layouts.app');
     }
 }
