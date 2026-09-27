@@ -18,6 +18,7 @@ export function initStreetCodeIntro() {
     const mascotCharEl = document.getElementById('intro-mascot-char');
     const autoEnterTimerEl = document.getElementById('streetcode-auto-timer');
     const canvas = document.getElementById('streetcode-juice-canvas');
+    const logoVideo = document.getElementById('streetcode-logo-video');
     const isSw = document.documentElement.lang === 'sw';
 
     // Skip Intro handling (e.g. after logout, skip query param, or already seen this session)
@@ -215,6 +216,7 @@ export function initStreetCodeIntro() {
 
     // Close and Enter Main Page
     const enterGame = () => {
+        logoVideo?.pause();
         if (counterInterval) clearInterval(counterInterval);
         if (autoCountdownInterval) clearInterval(autoCountdownInterval);
 
@@ -488,6 +490,10 @@ export function initStreetCodeIntro() {
         introEl.style.opacity = '1';
         introEl.style.transform = 'scale(1)';
         introEl.style.pointerEvents = 'auto';
+        if (logoVideo) {
+            logoVideo.currentTime = 0;
+            logoVideo.play().catch(() => {});
+        }
 
         initJuiceCanvas();
         startCounter();
@@ -495,6 +501,7 @@ export function initStreetCodeIntro() {
 
     // If skip flag is active, do not run intro or play audio automatically
     if (shouldSkip) {
+        logoVideo?.pause();
         introEl.classList.add('hidden');
         introEl.style.display = 'none';
         return;

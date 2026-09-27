@@ -109,9 +109,15 @@
                 {{-- Shimmer Light Sweep --}}
                 <div class="pointer-events-none absolute -inset-full w-[200%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-gold-shimmer"></div>
 
-                <img src="{{ asset('images/streetcode-logo.png') }}"
-                     alt="StreetCode"
-                     class="w-32 sm:w-40 md:w-44 h-auto max-h-16 sm:max-h-20 object-contain mx-auto drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] transition-transform duration-300 group-hover:scale-105" />
+                <video id="streetcode-logo-video"
+                       autoplay muted loop playsinline
+                       preload="metadata"
+                       poster="{{ asset('images/streetcode-logo-poster.png') }}"
+                       aria-label="StreetCode"
+                       class="w-44 h-24 sm:w-52 sm:h-28 object-cover object-center rounded-lg mx-auto transition-transform duration-300 group-hover:scale-105">
+                    <source src="{{ asset('videos/streetcode-logo.mp4') }}" type="video/mp4" />
+                    <img src="{{ asset('images/streetcode-logo-poster.png') }}" alt="StreetCode" />
+                </video>
             </div>
         </div>
 
